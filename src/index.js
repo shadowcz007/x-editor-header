@@ -3,6 +3,7 @@
  */
 require('./index.css').toString();
 const AutoSuggest = require('@avcs/autosuggest').default;
+const SuggestionList = require('@avcs/autosuggest/es/SuggestionList').default;
 
 /**
  * @typedef {Object} HeaderData
@@ -75,7 +76,9 @@ class Header {
          * @type {HTMLElement}
          * @private
          */
-        this._element = this.getTag();
+        this.id = "_x_header_" + (new Date()).getTime();
+        this._element = this.getTag(this.id);
+
     }
 
     /**
@@ -104,12 +107,20 @@ class Header {
      */
     render() {
         //console.log("====", this._element)
+        this.api.listeners.on(this._element, "focus", e => {
+            e.preventDefault();
+            this._addSuggestion(["默认1", "默认2"]);
+        });
         this.api.listeners.on(this._element, "input", e => {
             e.preventDefault();
-            console.log(e)
+            //console.log(e)
             let inputText = this._element.innerText.trim();
+            if (inputText.indexOf("?") == inputText.length - 1 || inputText.indexOf("？") == inputText.length - 1) {
+                inputText = inputText.slice(0, -1);
+            }
             this._search(inputText);
         });
+
         return this._element;
     }
 
@@ -307,7 +318,7 @@ class Header {
      * By default returns second-leveled header
      * @return {HTMLElement}
      */
-    getTag() {
+    getTag(id) {
         /**
          * Create element for current Block's level
          */
@@ -332,6 +343,8 @@ class Header {
          * Add Placeholder
          */
         tag.dataset.placeholder = this._settings.placeholder || '';
+
+        tag.id = id;
 
         return tag;
     }
@@ -503,11 +516,13 @@ class Header {
     _search(inputText) {
         let script = document.createElement("script");
         script.src = 'http://suggestion.baidu.com/su?wd=' + inputText + '&cb=headerSearchResult';
-        script.id = "_s_" + (new Date()).getTime();
+        script.id = "_script_" + this.id;
+        //console.log(inputText)
         document.body.appendChild(script);
         window.headerSearchResult = this._searchResult;
         window.headerSearchId = script.id;
-        this._element.id = "_element_" + script.id;
+        window.headerId = this.id;
+        window.headerSearchAddSuggestion = this._addSuggestion;
         window.headerSearchTextTips = this._createTextTips;
     }
 
@@ -515,60 +530,43 @@ class Header {
         if (document.querySelector("#" + window.headerSearchId)) {
             document.querySelector("#" + window.headerSearchId).remove();
         };
-        console.log(data.s);
-        let instance = new AutoSuggest({
-            caseSensitive: false,
-            // An example of on change callback, "this" will be the DOM Element in which this suggestion is appended
-            onChange: function(suggestion) {
-                const change = suggestion.insertHtml || suggestion.insertText;
-                console.log('"' + change + '" has been inserted into #' + this.id);
+        //console.log(data.s);
+        if (data.s.length > 0) {
+            document.querySelector("#" + window.headerId).classList.toggle("hasTip")
+            window.headerSearchAddSuggestion(data.s);
+        }
+
+    }
+
+    _addSuggestion(values) {
+        let suggestions = [{
+                trigger: '?',
+                caseSensitive: true,
+                values: values
             },
-            suggestions: [{
-                    // Example of using multiple characters as a trigger
-                    trigger: '//',
-                    // Example of caseSensitive option
-                    caseSensitive: true,
-                    // Example of passing values as strings
-                    values: ['hello', 'world', 'idiot', 'peter', 'pro', 'avcs']
-                }, function(keyword, callback) {
-                    keyword = keyword.toLowerCase();
-
-                    var results = [];
-                    var dataset = this.value || this.textContent;
-                    dataset = dataset.toLowerCase().split(/[^a-zA-Z0-9_]+/);
-                    dataset.forEach(function(word) {
-                        if (
-                            word.length >= 4 &&
-                            !word.indexOf(keyword) &&
-                            word !== keyword &&
-                            results.indexOf(word) === -1
-                        ) {
-                            results.push(word);
-                        }
-                    });
-
-                    setTimeout(function() {
-                        callback(results);
-                    }, 1000);
-                }
-
-            ]
-        }, document.getElementById("_element_" + window.headerSearchId));
+            {
+                trigger: '？',
+                caseSensitive: true,
+                values: values
+            }
+        ];
+        if (!window.suggestionInstance) {
+            window.suggestionInstance = new AutoSuggest({
+                caseSensitive: false,
+                onChange: function(suggestion) {
+                    const change = suggestion.insertHtml || suggestion.insertText;
+                    console.log('"' + change + '" has been inserted into #' + this.id);
+                },
+                suggestions: suggestions
+            }, document.getElementById(this.id));
+        } else {
+            window.suggestionInstance.suggestionLists = Array.from(suggestions, s => new SuggestionList(s));
+        }
+        if (window.suggestionInstance.inputs.filter(input => input.id == this.id).length > 0) return;
+        if (document.getElementById(this.id)) window.suggestionInstance.addInputs(document.getElementById(this.id));
 
     }
 
-    _createTextTips() {
-        let div = document.createElement("div");
-        div.style.width = "100px";
-        div.style.height = "100px";
-        div.style.background = "red";
-        div.style.position = "absolute";
-        div.style.top = 0;
-        div.style.left = 0;
-        div.style.zIndex = 99;
-        return div
-
-    }
 
 }
 
