@@ -79,14 +79,24 @@ class Header {
         this.id = "_x_header_" + (new Date()).getTime();
         this._element = this.getTag(this.id);
 
+        //智能提示
+        this.suggestionTexts = [] || this._getLocalSuggestion();
+
     }
 
-    /**
-     * Normalize input data
-     * @param {HeaderData} data
-     * @return {HeaderData}
-     * @private
-     */
+    _getLocalSuggestion() {
+        let res = localStorage.getItem("x-header-suggestionTexts") || "";
+        return res.split(",");
+    }
+    _setLocalSuggestion(texts) {
+            localStorage.setItem("x-header-suggestionTexts", texts);
+        }
+        /**
+         * Normalize input data
+         * @param {HeaderData} data
+         * @return {HeaderData}
+         * @private
+         */
     normalizeData(data) {
         const newData = {};
 
@@ -109,7 +119,19 @@ class Header {
         //console.log("====", this._element)
         this.api.listeners.on(this._element, "focus", e => {
             e.preventDefault();
-            this._addSuggestion(["默认1", "默认2"]);
+
+            let inputText = this._element.innerText.trim();
+            if (inputText.indexOf("?") == inputText.length - 1 || inputText.indexOf("？") == inputText.length - 1) {
+                inputText = inputText.slice(0, -1);
+            }
+            if (!inputText) {
+                this._clearSuggestion();
+            }
+            //console.log(this._getLocalSuggestion())
+            this._addSuggestion(this._getLocalSuggestion());
+
+            this._search(inputText);
+
         });
         this.api.listeners.on(this._element, "input", e => {
             e.preventDefault();
@@ -118,6 +140,10 @@ class Header {
             if (inputText.indexOf("?") == inputText.length - 1 || inputText.indexOf("？") == inputText.length - 1) {
                 inputText = inputText.slice(0, -1);
             }
+            if (!inputText) {
+                this._clearSuggestion();
+            }
+
             this._search(inputText);
         });
 
@@ -513,7 +539,13 @@ class Header {
         };
     }
 
+    _clearSuggestion() {
+        this._setLocalSuggestion("");
+        this._element.classList.remove("ce-header-tip");
+    }
+
     _search(inputText) {
+        if (!inputText) return;
         let script = document.createElement("script");
         script.src = 'http://suggestion.baidu.com/su?wd=' + inputText + '&cb=headerSearchResult';
         script.id = "_script_" + this.id;
@@ -524,6 +556,7 @@ class Header {
         window.headerId = this.id;
         window.headerSearchAddSuggestion = this._addSuggestion;
         window.headerSearchTextTips = this._createTextTips;
+        window.setLocalSuggestion = this._setLocalSuggestion;
     }
 
     _searchResult(data) {
@@ -531,11 +564,15 @@ class Header {
             document.querySelector("#" + window.headerSearchId).remove();
         };
         //console.log(data.s);
+        let element = document.querySelector("#" + window.headerId);
+        element.setAttribute("data-count", data.s.length);
         if (data.s.length > 0) {
-            document.querySelector("#" + window.headerId).classList.toggle("hasTip")
+            if (!("ce-header-tip" in element.classList)) element.classList.add("ce-header-tip");
             window.headerSearchAddSuggestion(data.s);
+        } else {
+            element.classList.remove("ce-header-tip");
         }
-
+        window.setLocalSuggestion(data.s);
     }
 
     _addSuggestion(values) {
@@ -555,6 +592,7 @@ class Header {
                 caseSensitive: false,
                 onChange: function(suggestion) {
                     const change = suggestion.insertHtml || suggestion.insertText;
+                    document.querySelector("#" + window.headerId).innerText = change;
                     console.log('"' + change + '" has been inserted into #' + this.id);
                 },
                 suggestions: suggestions

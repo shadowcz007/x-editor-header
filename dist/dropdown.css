@@ -51,6 +51,7 @@
     line-height: 1.42857143;
     color: #333333;
     white-space: nowrap;
+    cursor: pointer;
 }
 
 .dropdown-menu>li>a:hover,

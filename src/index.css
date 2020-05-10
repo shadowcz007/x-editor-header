@@ -38,3 +38,12 @@
 .ce-header[contentEditable=true][data-placeholder]:empty:focus::before {
     display: none;
 }
+
+.ce-header-tip::after {
+    content: attr(data-count);
+    font-size: 12px;
+    font-weight: 800;
+    position: absolute;
+    line-height: 12px;
+    color: silver;
+}
